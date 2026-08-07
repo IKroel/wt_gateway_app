@@ -1,80 +1,89 @@
 # wt_gateway_app
 
-App **Flutter (Android)** para instaladores: descubre por BLE los accesorios
-de corte (placas ESP32), los **asigna/provisiona** y permite **liberar el corte
-de combustible**. El corte es **autónomo en el equipo** (decide por ignición +
-geocerca); la app solo autentica y puede *deshabilitarlo*.
+Aplicación **Flutter (Android)** para instaladores. Descubre por Bluetooth (BLE)
+los accesorios de corte (placas ESP32), los asigna a un vehículo y permite
+liberar el corte de combustible. El corte es autónomo en el equipo —decide por
+ignición y geocerca—; la app autentica y solo puede deshabilitarlo.
 
-- Versión actual: **1.0.0** · ver [CHANGELOG.md](CHANGELOG.md)
-- Estado: **funcional de extremo a extremo** sobre firmware V1 (ver más abajo)
-- Licencia: [MIT](LICENSE)
+- **Versión:** 1.0.0 · ver [CHANGELOG.md](CHANGELOG.md)
+- **Plataforma:** Android (probado en dispositivo físico)
+- **Licencia:** [MIT](LICENSE)
 
 ---
 
 ## Estado del proyecto
 
-### Listo y funcional
-- Escaneo BLE con filtro por *manufacturer data* y agrupación por cercanía.
-- Chip de estado único por equipo (Sin asignar / Corte activo / Liberado / Estado sin leer).
-- Conexión en 3 pasos (Conectar → Autenticar → Leer estado) como *bottom sheet*, con reintento por etapa.
-- Autenticación reto-respuesta HMAC-SHA256.
-- Wizard de asignación (identificar → confirmar → provisionar → listo) con resultado tipado.
-- Liberar corte con confirmación real (`<CUT_DISABLED`).
-- Desasignar equipo (renombra la placa al genérico `WT-xxxx` por detrás).
-- Tema claro/oscuro persistido, sistema de diseño propio y componentes custom.
-- Log de depuración exportable.
-- `flutter analyze`: **0 issues**.
+El proyecto está **funcional de extremo a extremo** contra el firmware V1:
+escanear, conectar, asignar y liberar el corte funcionan sobre un equipo real.
+`flutter analyze` corre sin issues. Es una base estable y modular pensada para
+que otros la clonen y agreguen módulos encima.
 
-### No incluido / pensado para extender
-- Entrega de la master key desde servidor (hoy se inyecta por `--dart-define`; ver [Seguridad](#seguridad)).
-- iOS (el proyecto compila multiplataforma pero solo se validó en Android).
-- Backend de flota / sincronización remota.
-- Reasignación remota y auditoría centralizada.
-- Pruebas automatizadas más allá del smoke test.
+### Implementado y funcional
+
+- Escaneo BLE con filtro por *manufacturer data* y agrupación por cercanía.
+- Chip de estado por equipo: `Sin asignar`, `Corte activo`, `Liberado`, `Estado sin leer`.
+- Conexión guiada en 3 pasos (Conectar → Autenticar → Leer estado) con reintento por etapa.
+- Autenticación reto-respuesta HMAC-SHA256.
+- Wizard de asignación en 4 pasos (identificar → confirmar → provisionar → listo).
+- Liberar corte con confirmación real del equipo.
+- Desasignar equipo (renombra la placa al genérico `WT-xxxx`).
+- Tema claro/oscuro persistido y sistema de diseño propio (componentes custom).
+- Log de depuración exportable.
+
+### Fuera de alcance (para extender)
+
+- Backend de flota y sincronización remota.
+- Compilación y validación en iOS (el árbol es multiplataforma, pero solo se validó Android).
+- Reasignación y auditoría centralizada.
+- Pruebas automatizadas más allá del smoke test incluido.
 
 ---
 
 ## Requisitos
 
-| Herramienta | Versión |
+| Herramienta | Versión / nota |
 |---|---|
 | Flutter SDK | `>=3.6.0 <4.0.0` (Flutter 3.27+ / Dart 3.6+) |
-| Android SDK | API 21+ (compileSdk según Flutter) |
+| Android SDK | API 21+ |
 | Dispositivo | Android físico con BLE (el emulador no tiene Bluetooth) |
 
-Dependencias principales (`pubspec.yaml`): `flutter_blue_plus`, `crypto`,
-`convert`, `permission_handler`, `shared_preferences`, `path_provider`,
-`share_plus`.
+Dependencias clave: `flutter_blue_plus`, `crypto`, `convert`,
+`permission_handler`, `shared_preferences`, `path_provider`, `share_plus`.
+
+La master key de pruebas ya viene definida en `lib/config.dart`; no requiere
+configuración adicional para trabajar contra los equipos de prueba.
 
 ---
 
-## Puesta en marcha (entorno propio)
+## Cómo correrlo
 
 ```bash
-# 1. Clonar
-git clone https://github.com/<usuario>/wt_gateway_app.git
+git clone https://github.com/IKroel/wt_gateway_app.git
 cd wt_gateway_app
-
-# 2. (Solo si faltan carpetas de plataforma android/ o ios/)
-flutter create .
-
-# 3. Dependencias
 flutter pub get
+flutter run
+```
 
-# 4. Ejecutar en un dispositivo Android conectado, inyectando la master key
-flutter run --dart-define=WT_MASTER_SECRET=<64_caracteres_hex>
+Si al clonar faltan las carpetas de plataforma (`android/`, `ios/`), genéralas
+sin tocar `lib/` y vuelve a correr:
+
+```bash
+flutter create .
+flutter pub get
+flutter run
 ```
 
 Compilar el APK de release:
 
 ```bash
-flutter build apk --release --dart-define=WT_MASTER_SECRET=<64_caracteres_hex>
+flutter build apk --release
 ```
 
-Generar una master key de ejemplo:
+Verificar calidad del código:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
+dart format .
+flutter analyze
 ```
 
 Los permisos BLE ya están declarados en
@@ -87,60 +96,51 @@ Los permisos BLE ya están declarados en
 
 ```
 lib/
-├── config.dart            constantes (master key vía --dart-define, UUIDs NUS, filtro BLE)
-├── main.dart              entrada, init de stores, MaterialApp + tema
-├── models/                DeviceState (+ AccessoryChip), VehicleType
-├── services/              BLE, cripto (HMAC), stores (tema/equipos/master), log
-├── theme/                 sistema de diseño (WtColors mode-aware, ThemeData)
-├── widgets/               componentes reutilizables:
-│                          wt_button, wt_nav_bar, wt_switch, wt_dialog, wt_toast,
-│                          motion (rutas/animaciones), status_chip, signal_bars,
-│                          circle_button, icon_chip
-└── screens/               scanner, connection (sheet), device, provision (wizard),
-                           settings, debug, edit_vehicle_dialog
+├── config.dart      Constantes: master key, UUIDs NUS, filtro BLE.
+├── main.dart        Entrada, init de stores, MaterialApp + tema.
+├── models/          DeviceState (+ AccessoryChip), VehicleType.
+├── services/        BLE, cripto (HMAC), stores (tema/equipos), log.
+├── theme/           Sistema de diseño: WtColors mode-aware + ThemeData.
+├── widgets/         Componentes reutilizables (botón, nav, switch,
+│                    diálogo, toast, animaciones, chips, señal).
+└── screens/         scanner, connection, device, provision (wizard),
+                     settings, debug, edit_vehicle_dialog.
 ```
 
-Para **agregar un módulo**: crea la pantalla en `screens/`, reutiliza los
-`widgets/` y los tokens de `theme/wt_theme.dart` (`wt.*` + constantes de marca),
-y expón la lógica BLE nueva en `services/ble_service.dart`.
+---
+
+## Cómo extender
+
+1. Crea la pantalla nueva en `lib/screens/`.
+2. Navega con las rutas de `lib/widgets/motion.dart` (`slideUpRoute`,
+   `slideOverRoute`) para mantener el movimiento consistente.
+3. Reutiliza los componentes de `lib/widgets/` y los tokens de
+   `lib/theme/wt_theme.dart` (`wt.*` para superficies y texto; `kTeal`,
+   `kPetrol`, etc. para acentos de marca).
+4. Agrega comandos BLE nuevos en `lib/services/ble_service.dart`, respetando el
+   patrón de fases y errores tipados.
+
+Guía completa en [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
 ## Protocolo BLE
 
-Transporte **Nordic UART Service** (`6E400001` / RX `…0002` / TX `…0003`).
-Comandos ASCII con prefijo `>`, respuestas con `<`. Autenticación:
+Transporte Nordic UART Service (`6E400001` / RX `…0002` / TX `…0003`). Comandos
+ASCII con prefijo `>`, respuestas con `<`. Autenticación:
 
 ```
 device_key = HMAC-SHA256(master, MAC_bytes[6])
 token      = HMAC-SHA256(device_key, nonce)[0:16]
 ```
 
-Comandos usados: `>STATUS`, `>CHALLENGE`, `>AUTH`, `>MAC`, `>NAME`,
-`>PROVISION`, `>DISABLECUT`, `>UNPROVISION`, `>VERSION`.
-
----
-
-## Seguridad
-
-> La master key **no se versiona**. El repositorio trae un placeholder no
-> funcional (`0000…`). Inyecta la real con `--dart-define=WT_MASTER_SECRET=...`.
->
-> Limitación conocida: la key inyectada queda embebida en el binario, por lo que
-> quien decompile el APK puede derivar la `device_key` de cualquier equipo. Para
-> producción, la key debe entregarla el servidor por sesión (login → JWT → vault)
-> o moverse la firma del nonce al lado servidor. No publiques APKs de release con
-> la master real.
+Comandos: `>STATUS`, `>CHALLENGE`, `>AUTH`, `>MAC`, `>NAME`, `>PROVISION`,
+`>DISABLECUT`, `>UNPROVISION`, `>VERSION`.
 
 ---
 
 ## Versionado
 
-Semver `MAJOR.MINOR.PATCH+BUILD` en `pubspec.yaml`. Todo cambio relevante se
-registra en [CHANGELOG.md](CHANGELOG.md). Trabaja siempre sobre la última
-versión publicada ahí.
-
-## Contribuir
-
-Ver [CONTRIBUTING.md](CONTRIBUTING.md). Regla mínima: `flutter analyze` sin
-issues y `dart format .` antes de abrir un PR.
+Semver `MAJOR.MINOR.PATCH+BUILD` en `pubspec.yaml`. Cada cambio relevante queda
+en [CHANGELOG.md](CHANGELOG.md). Trabaja siempre sobre la última versión
+publicada ahí.

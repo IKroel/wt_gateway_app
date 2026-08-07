@@ -1,17 +1,8 @@
 // Constantes globales: master key, UUIDs NUS y filtro BLE.
 //
-// SEGURIDAD: la master key NO se versiona. Inyéctala al compilar:
-//   flutter run   --dart-define=WT_MASTER_SECRET=<64 hex>
-//   flutter build --dart-define=WT_MASTER_SECRET=<64 hex>
-// El valor por defecto es un placeholder NO funcional (solo demo/UI).
-// Limitación conocida: aún embebida en el binario resultante. En producción
-// debe entregarla el servidor por sesión (JWT → vault) o firmar el nonce
-// del lado servidor para que la app nunca vea el master.
-const String kMasterSecret = String.fromEnvironment(
-  'WT_MASTER_SECRET',
-  defaultValue:
-      '0000000000000000000000000000000000000000000000000000000000000000',
-);
+// Master key de pruebas: única y compartida por todos los equipos de prueba.
+const String kMasterSecret =
+    'cfc03b94812eee0b3d3b385b1378bb034c8303cdc94975ce34958056d0a5f76c';
 
 // BLE — Nordic UART Service
 const String kNusSvcUuid = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E';

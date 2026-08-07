@@ -46,7 +46,3 @@ ios/.symlinks/
 # Generado por codegen (si se usa)
 *.g.dart
 *.freezed.dart
-
-# Secretos locales (nunca subir la master key real)
-.env
-*.secret

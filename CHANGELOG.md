@@ -27,10 +27,6 @@ sobre el prototipo funcional (heredado como `1.2.0` del proyecto anterior).
 - Al desprovisionar, la placa se renombra al genérico `WT-xxxx` (por detrás).
 - `DeviceState.initial()` arranca con `provisioned: false`.
 
-### Seguridad
-- La master key ya no se versiona: se inyecta con `--dart-define=WT_MASTER_SECRET`;
-  el repo trae solo un placeholder no funcional.
-
 ### Eliminado
 - Modo test/producción (`app_mode.dart`) y banco de pruebas del flujo de instalador.
 - Selector de tipo de accesorio, UI de master key y toggle de corte.

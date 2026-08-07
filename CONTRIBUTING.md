@@ -7,8 +7,7 @@ y **extender** la app con nuevos módulos.
 
 - Flutter `>=3.6.0`. Corre `flutter doctor` y resuelve lo que marque.
 - `flutter pub get`.
-- Corre la app con la master key de prueba:
-  `flutter run --dart-define=WT_MASTER_SECRET=<64 hex>`.
+- Corre la app con `flutter run` (la master key de pruebas ya viene en `lib/config.dart`).
 
 ## Estilo y calidad
 
@@ -34,9 +33,3 @@ y **extender** la app con nuevos módulos.
 2. Commits pequeños y descriptivos.
 3. `dart format .` + `flutter analyze` en verde.
 4. Abre un Pull Request describiendo el cambio y cómo probarlo.
-
-## Seguridad
-
-Nunca subas la master key real ni un APK de release firmado con ella. La key se
-inyecta por `--dart-define`; el repo solo contiene un placeholder.
-Reporta problemas de seguridad de forma privada, no en un issue público.
