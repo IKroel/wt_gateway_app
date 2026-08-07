@@ -1,41 +1,37 @@
 # wt_gateway_app
 
-Aplicación **Flutter (Android)** para instaladores. Descubre por Bluetooth (BLE)
-los accesorios de corte (placas ESP32), los asigna a un vehículo y permite
-liberar el corte de combustible. El corte es autónomo en el equipo —decide por
-ignición y geocerca—; la app autentica y solo puede deshabilitarlo.
+Aplicación **Flutter (Android)** para instaladores. Descubre por Bluetooth
+los modulos ESP32, los asigna a un vehículo y permite
+liberar el corte de combustible. El corte es autónomo en el equipo; la app autentica y solo puede deshabilitarlo.
 
 - **Versión:** 1.0.0 · ver [CHANGELOG.md](CHANGELOG.md)
-- **Plataforma:** Android (probado en dispositivo físico)
+- **Plataforma:** Android
 - **Licencia:** [MIT](LICENSE)
 
 ---
 
 ## Estado del proyecto
 
-El proyecto está **funcional de extremo a extremo** contra el firmware V1:
+El proyecto está **funcional** con el firmware V1:
 escanear, conectar, asignar y liberar el corte funcionan sobre un equipo real.
-`flutter analyze` corre sin issues. Es una base estable y modular pensada para
-que otros la clonen y agreguen módulos encima.
+Es un release estable y modular pensado para
+que otros la clonen y agreguen módulos.
 
 ### Implementado y funcional
 
-- Escaneo BLE con filtro por *manufacturer data* y agrupación por cercanía.
+- Escaneo BLE con filtro y agrupación por cercanía.
 - Chip de estado por equipo: `Sin asignar`, `Corte activo`, `Liberado`, `Estado sin leer`.
 - Conexión guiada en 3 pasos (Conectar → Autenticar → Leer estado) con reintento por etapa.
 - Autenticación reto-respuesta HMAC-SHA256.
 - Wizard de asignación en 4 pasos (identificar → confirmar → provisionar → listo).
-- Liberar corte con confirmación real del equipo.
+- Liberar corte del equipo.
 - Desasignar equipo (renombra la placa al genérico `WT-xxxx`).
-- Tema claro/oscuro persistido y sistema de diseño propio (componentes custom).
 - Log de depuración exportable.
 
-### Fuera de alcance (para extender)
+### Fuera del alcance V1.0
 
-- Backend de flota y sincronización remota.
-- Compilación y validación en iOS (el árbol es multiplataforma, pero solo se validó Android).
-- Reasignación y auditoría centralizada.
-- Pruebas automatizadas más allá del smoke test incluido.
+- Asignacion de Usuarios (Creacion de Cuenta o Similares).
+- Compilación y validación en iOS.
 
 ---
 
@@ -45,13 +41,12 @@ que otros la clonen y agreguen módulos encima.
 |---|---|
 | Flutter SDK | `>=3.6.0 <4.0.0` (Flutter 3.27+ / Dart 3.6+) |
 | Android SDK | API 21+ |
-| Dispositivo | Android físico con BLE (el emulador no tiene Bluetooth) |
+| Dispositivo | Android físico con Bluetooth |
 
 Dependencias clave: `flutter_blue_plus`, `crypto`, `convert`,
 `permission_handler`, `shared_preferences`, `path_provider`, `share_plus`.
 
-La master key de pruebas ya viene definida en `lib/config.dart`; no requiere
-configuración adicional para trabajar contra los equipos de prueba.
+La master key de pruebas ya viene definida en `lib/config.dart`.
 
 ---
 
@@ -79,7 +74,7 @@ Compilar el APK de release:
 flutter build apk --release
 ```
 
-Verificar calidad del código:
+Verificar código:
 
 ```bash
 dart format .

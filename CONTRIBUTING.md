@@ -1,7 +1,7 @@
 # Guía de contribución
 
 Gracias por sumar. El objetivo del repo es que cualquiera pueda clonar, correr
-y **extender** la app con nuevos módulos.
+y **extender** la app con nuevos módulos a partir de una base local.
 
 ## Antes de empezar
 
@@ -13,8 +13,7 @@ y **extender** la app con nuevos módulos.
 
 - `dart format .` — formato estándar de Dart.
 - `flutter analyze` — debe salir **sin issues** antes de abrir un PR.
-- Comentarios: notas cortas sobre funciones principales; sin comentar lo obvio.
-- No re-declarar componentes: reutiliza `lib/widgets/` y los tokens de
+- Reutiliza `lib/widgets/` y los tokens de
   `lib/theme/wt_theme.dart` (`wt.*` para superficies/texto mode-aware; las
   constantes `kTeal`, `kPetrol`, etc. para acentos de marca).
 
@@ -26,10 +25,3 @@ y **extender** la app con nuevos módulos.
 3. Si necesitas comandos BLE nuevos, agrégalos en
    `lib/services/ble_service.dart` (respeta el patrón de fases/errores tipados).
 4. Persistencia local → `lib/services/vehicle_store.dart` u otro store.
-
-## Flujo de trabajo Git
-
-1. Crea una rama desde `main`: `git checkout -b feat/mi-modulo`.
-2. Commits pequeños y descriptivos.
-3. `dart format .` + `flutter analyze` en verde.
-4. Abre un Pull Request describiendo el cambio y cómo probarlo.
