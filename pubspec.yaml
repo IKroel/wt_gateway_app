@@ -1,0 +1,26 @@
+name: wt_gateway_app
+description: App BLE para asignación y corte de accesorios. Firmware V1 (corte autónomo por ignición/geocerca).
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_blue_plus: ^1.32.0
+  crypto: ^3.0.3
+  convert: ^3.1.1
+  permission_handler: ^11.3.0
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.2
+  share_plus: ^10.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
