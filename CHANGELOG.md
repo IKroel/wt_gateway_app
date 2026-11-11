@@ -3,6 +3,35 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/).
 Versionado semántico: `MAJOR.MINOR.PATCH+BUILD`.
 
+## [1.1.0] — 2026-11-11
+
+Asignación en modo **Protect** o **Sharing** (firmware V3, `caps=mode`).
+Compatible con firmware V1: lo nuevo solo aparece si la placa lo anuncia en `caps`.
+
+### Agregado
+- Modo de operación en el wizard de asignación (`Protect` / `Sharing`), enviado
+  con `>SET_MODE` una vez autenticada la sesión. Si el firmware no admite modos,
+  la placa queda en Protect y se avisa. Modelo `BoardMode`.
+- Detalle del equipo: fila **Modo**; aviso **Equipo en standby** (`en=0`) con
+  botón **Habilitar** (`>ENABLE 1`, fw >= 3.4.6).
+- Aviso de activación del corte (`<LOCK`, fw >= 3.4.5): si la app está conectada
+  cuando la placa aplica el corte, muestra "Corte activado · puertas cerradas"
+  (o el error) y lo registra en el log (`AUDIT LOCK …`).
+- `DeviceState`: `mode`, `caps`, `enabled`. `BleService`: `setMode`,
+  `setEnabled` y petición genérica `_request()` (una a la vez, con timeout).
+- Log de depuración: colores para `<TXGPS` / `<GPSACK` (respuesta OK/ERROR del
+  GPS a cada orden) legibles en modo claro.
+
+### Cambiado
+- Liberar corte: en Sharing el aviso indica que también se abren las puertas.
+  La app espera la confirmación del GPS (`<RELEASE … gps=ok|error|timeout`,
+  fw >= 3.4.2), la registra en el log (`AUDIT RELEASE …`) y la muestra; con
+  fw >= 3.4.4 `<ERR release_…` se trata como liberación fallida.
+
+### Corregido
+- Dos conexiones simultáneas al mismo equipo (reintento + pantalla) hacían
+  fallar el AUTH; ahora se ignora la segunda.
+
 ## [1.0.0] — 2026-08-06
 
 Primera versión productiva del repositorio. Línea base tras el rediseño UI/UX

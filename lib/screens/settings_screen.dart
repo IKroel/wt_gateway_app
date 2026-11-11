@@ -74,7 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 24),
             Center(
-              child: Text('v1.3.0',
+              child: Text('v1.1.0',
                   style: TextStyle(color: wt.gray, fontSize: 12)),
             ),
           ],

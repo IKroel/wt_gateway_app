@@ -1,16 +1,18 @@
 // Wizard de asignación (provisión) en 4 pasos:
-// 1. Identificar (nombre + tipo)
+// 1. Identificar (nombre + tipo + modo de operación)
 // 2. Confirmar datos
 // 3. Provisionando (progreso real)
 // 4. Listo (éxito)
 
 import 'package:flutter/material.dart';
+import '../models/board_mode.dart';
 import '../models/vehicle_type.dart';
 import '../services/ble_service.dart';
 import '../services/vehicle_store.dart';
 import '../theme/wt_theme.dart';
 import '../widgets/circle_button.dart';
 import '../widgets/wt_button.dart';
+import '../widgets/wt_toast.dart';
 
 class ProvisionScreen extends StatefulWidget {
   final BleService ble;
@@ -24,6 +26,7 @@ class _ProvisionScreenState extends State<ProvisionScreen> {
   int _step = 0; // 0=identificar, 1=confirmar, 2=provisionando, 3=listo
   final _nameCtrl = TextEditingController();
   VehicleType _type = VehicleType.camioneta;
+  String _mode = BoardMode.protect; // modo con que queda la placa
   String? _error;
 
   // Progreso de provisión (3 sub-pasos visuales)
@@ -79,6 +82,30 @@ class _ProvisionScreenState extends State<ProvisionScreen> {
         await VehicleStore.setIcon(mac, _type);
         await VehicleStore.markAssigned(mac);
       }
+      // Modo de operación: la placa re-autentica tras <PROVISION_OK y >SET_MODE
+      // exige sesión, así que se espera el AUTH (máx. 5 s) antes de enviarlo.
+      for (var i = 0; i < 25 && !widget.ble.authed; i++) {
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+      if (!mounted) return;
+      if (!widget.ble.state.supportsModes) {
+        // Firmware sin modos: la placa solo hace Protect.
+        if (_mode != BoardMode.protect) {
+          showWtToast(context,
+              'Asignado en Protect: el firmware de la placa no admite Sharing',
+              error: true);
+        }
+      } else if (!widget.ble.authed) {
+        showWtToast(context, 'Asignado, pero no se pudo fijar el modo (sin sesión)',
+            error: true);
+      } else {
+        final err = await widget.ble.setMode(_mode);
+        if (err != null && mounted) {
+          showWtToast(context, 'Asignado, pero no se pudo fijar el modo ($err)',
+              error: true);
+        }
+      }
+      if (!mounted) return;
       setState(() => _step = 3);
     } else {
       setState(() {
@@ -168,9 +195,17 @@ class _ProvisionScreenState extends State<ProvisionScreen> {
       };
 
   /// Paso 1: identificar equipo (nombre + tipo).
-  Widget _stepIdentify() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
+  Widget _stepIdentify() => LayoutBuilder(
+        builder: (context, box) => SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: box.maxHeight),
+            child: IntrinsicHeight(child: _identifyColumn()),
+          ),
+        ),
+      );
+
+  Widget _identifyColumn() => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Identifica el vehículo',
@@ -204,6 +239,34 @@ class _ProvisionScreenState extends State<ProvisionScreen> {
                 ],
               ],
             ),
+            const SizedBox(height: 20),
+            _eyebrow('MODO DE OPERACIÓN'),
+            const SizedBox(height: 8),
+            for (final o in BoardMode.options)
+              InkWell(
+                onTap: () => setState(() => _mode = o.$1),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    children: [
+                      Icon(
+                          _mode == o.$1
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: kTeal,
+                          size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Text(o.$2,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: wt.ink))),
+                    ],
+                  ),
+                ),
+              ),
             const Spacer(),
             WtButton(
               label: 'Continuar',
@@ -214,8 +277,7 @@ class _ProvisionScreenState extends State<ProvisionScreen> {
             ),
             const SizedBox(height: 24),
           ],
-        ),
-      );
+        );
 
   /// Paso 2: confirmar datos antes de provisionar.
   Widget _stepConfirm() => Padding(
@@ -229,6 +291,7 @@ class _ProvisionScreenState extends State<ProvisionScreen> {
             const SizedBox(height: 20),
             _confirmRow('Nombre', _nameCtrl.text.trim()),
             _confirmRow('Tipo', _type.label),
+            _confirmRow('Modo', BoardMode.label(_mode)),
             _confirmRow('MAC', _mac),
             if (_error != null) ...[
               const SizedBox(height: 16),

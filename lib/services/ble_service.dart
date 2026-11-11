@@ -58,6 +58,16 @@ class BleService extends ChangeNotifier {
   /// Completers para operaciones que esperan respuesta del ESP.
   Completer<ProvisionResult>? _provisionCompleter;
   Completer<bool>? _disableCutCompleter;
+  Completer<String?>? _releaseCompleter;
+  /// Última confirmación de liberación (`<RELEASE …`, fw >= 3.4.2). null = sin dato.
+  String? lastRelease;
+  /// Última activación de corte informada por la placa (`<LOCK …`, fw >= 3.4.5) y
+  /// un contador que sube con cada una (para avisar en pantalla).
+  String? lastLock;
+  int lockSeq = 0;
+  /// Petición en curso de [_request]: completa con null (OK) o con el código <ERR.
+  Completer<String?>? _reqCompleter;
+  List<String> _reqOk = const [];
 
   String? get deviceMac => _deviceMac;
   bool get authed => _authed;
@@ -73,7 +83,22 @@ class BleService extends ChangeNotifier {
   // ── Conexión ────────────────────────────────────────────
 
   /// Conecta, autentica y lee estado. La fase se actualiza en cada tramo.
+  /// Evita dos conexiones simultáneas (reintento + pantalla): dos CHALLENGE
+  /// cruzados hacen fallar el AUTH (wrong_token / no_challenge).
+  bool _connecting = false;
+
   Future<void> connect(BluetoothDevice device) async {
+    if (_connecting) return;
+    if (_state.connected && _authed && _device?.remoteId == device.remoteId) return;
+    _connecting = true;
+    try {
+      await _connect(device);
+    } finally {
+      _connecting = false;
+    }
+  }
+
+  Future<void> _connect(BluetoothDevice device) async {
     _device = device;
     _deviceMac = device.remoteId.str;
     _authed = false;
@@ -271,23 +296,69 @@ class BleService extends ChangeNotifier {
     }
   }
 
-  /// Deshabilita el corte. Retorna true cuando el ESP confirma con <CUT_DISABLED.
+  /// Deshabilita el corte. Retorna true cuando el ESP confirma con <CUT_DISABLED
+  /// (fw >= 3.4.4: solo tras el OK del GPS; si no, `<ERR release_…`) y, si la
+  /// placa anuncia `release`, el detalle `<RELEASE … gps=…` queda en
+  /// [lastRelease] y en el log.
   Future<bool> disableCut() async {
     DebugLog.instance.audit('DISABLECUT', mac: _deviceMac);
     _disableCutCompleter = Completer<bool>();
+    final confirm = _state.caps.contains('release');
+    lastRelease = null;
+    if (confirm) _releaseCompleter = Completer<String?>();
     await sendCommand('>DISABLECUT');
     final timer = Timer(const Duration(seconds: 5), () {
       if (!(_disableCutCompleter?.isCompleted ?? true)) {
         _disableCutCompleter?.complete(false);
       }
     });
-    final ok = await _disableCutCompleter!.future;
+    var ok = await _disableCutCompleter!.future;
     timer.cancel();
     _disableCutCompleter = null;
+    if (confirm) {
+      final rel = await _releaseCompleter!.future
+          .timeout(Duration(seconds: ok ? 6 : 2), onTimeout: () => null);
+      lastRelease = rel ?? 'gps=sin_confirmacion';
+      DebugLog.instance.audit('RELEASE ${lastRelease!}', mac: _deviceMac);
+      ok = ok && rel != null && rel.contains('gps=ok');
+    }
+    _releaseCompleter = null;
     if (ok) await sendCommand('>STATUS');
     return ok;
   }
 
+  /// Envía [cmd] y espera una línea que empiece con alguno de [ok] (→ null)
+  /// o un <ERR (→ texto del error). Timeout → 'timeout'. Una petición a la vez.
+  Future<String?> _request(String cmd, List<String> ok,
+      {Duration timeout = const Duration(seconds: 6)}) async {
+    if (!(_reqCompleter?.isCompleted ?? true)) return 'busy';
+    final c = _reqCompleter = Completer<String?>();
+    _reqOk = ok;
+    await sendCommand(cmd);
+    final timer = Timer(timeout, () {
+      if (!c.isCompleted) c.complete('timeout');
+    });
+    final r = await c.future;
+    timer.cancel();
+    _reqCompleter = null;
+    return r;
+  }
+
+  /// Sale (true) o entra (false) en standby (fw >= 3.4.6, `>ENABLE 1|0`).
+  Future<String?> setEnabled(bool on) async {
+    DebugLog.instance.audit('ENABLE ${on ? 1 : 0}', mac: _deviceMac);
+    final r = await _request('>ENABLE ${on ? 1 : 0}', ['<OK en=']);
+    if (r == null) await sendCommand('>STATUS');
+    return r;
+  }
+
+  /// Cambia el modo de la placa: 'protect' | 'sharing' (ver BoardMode).
+  Future<String?> setMode(String mode) async {
+    DebugLog.instance.audit('SET_MODE $mode', mac: _deviceMac);
+    final r = await _request('>SET_MODE $mode', ['<OK mode=']);
+    if (r == null) await sendCommand('>STATUS');
+    return r;
+  }
 
   Future<void> setName(String name) async => sendCommand('>NAME $name');
 
@@ -341,6 +412,18 @@ class BleService extends ChangeNotifier {
 
     _addLog('← $msg');
 
+    // Petición genérica en curso (_request): OK por prefijo o <ERR.
+    final req = _reqCompleter;
+    if (req != null && !req.isCompleted) {
+      if (_reqOk.any(msg.startsWith)) {
+        req.complete(null);
+      } else if (msg.startsWith('<ERR')) {
+        // El error lo maneja quien hizo la petición (no se muestra como toast).
+        req.complete(msg.replaceFirst('<ERR', '').trim());
+        return;
+      }
+    }
+
     if (msg.startsWith('<STATUS')) {
       final cut = _extract(msg, 'cut=');
       _setState(_state.copyWith(
@@ -351,6 +434,8 @@ class BleService extends ChangeNotifier {
             ? null
             : (cut == '1' ? RelayState.cutActive : RelayState.free),
         cutDisabled: _parseBool(_extract(msg, 'override=')),
+        mode: _extract(msg, 'mode='),
+        enabled: _parseBool(_extract(msg, 'en=')),
       ));
       if (_phase == ConnPhase.reading) _setPhase(ConnPhase.ready);
       return;
@@ -359,6 +444,13 @@ class BleService extends ChangeNotifier {
     if (msg.startsWith('<VERSION')) {
       _firmwareVersion = msg.replaceFirst('<VERSION', '').trim();
       _versionAsked = false;
+      final caps = _extract(msg, 'caps=');
+      if (caps != null || _extract(msg, 'mode=') != null) {
+        _state = _state.copyWith(
+          caps: caps?.split(',').where((e) => e.isNotEmpty).toSet(),
+          mode: _extract(msg, 'mode='),
+        );
+      }
       final prov = _extract(msg, 'prov=');
       if (prov != null) {
         _setState(
@@ -401,6 +493,13 @@ class BleService extends ChangeNotifier {
       return;
     }
 
+    // fw >= 3.4.4: el GPS no confirmó la liberación.
+    if (msg.startsWith('<ERR release_') &&
+        !(_disableCutCompleter?.isCompleted ?? true)) {
+      _disableCutCompleter?.complete(false);
+      return;
+    }
+
     if (msg == '<CUT_DISABLED') {
       _setState(_state.copyWith(cutDisabled: true, clearError: true));
       if (!(_disableCutCompleter?.isCompleted ?? true)) {
@@ -408,6 +507,27 @@ class BleService extends ChangeNotifier {
       }
       return;
     }
+
+    // fw >= 3.4.5: la placa aplicó el corte (cierre + corte) y el GPS respondió.
+    // Informativo: llega solo si la app sigue conectada.
+    if (msg.startsWith('<LOCK')) {
+      lastLock = msg.replaceFirst('<LOCK', '').trim();
+      lockSeq++;
+      DebugLog.instance.audit('LOCK ${lastLock!}', mac: _deviceMac);
+      notifyListeners();
+      return;
+    }
+    if (msg == '<CUT_ENABLED' || msg.startsWith('<ERR lock_')) return; // detalle en <LOCK
+
+    if (msg.startsWith('<RELEASE')) {
+      final body = msg.replaceFirst('<RELEASE', '').trim();
+      if (!(_releaseCompleter?.isCompleted ?? true)) _releaseCompleter?.complete(body);
+      return;
+    }
+
+    // Sharing: <DOOR open|closed acompaña la liberación y el corte; el resultado
+    // se informa con <RELEASE / <LOCK.
+    if (msg.startsWith('<DOOR ')) return;
 
     if (msg == '<CUT_ARMED') {
       _setState(_state.copyWith(cutDisabled: false));

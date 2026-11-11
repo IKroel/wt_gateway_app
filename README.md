@@ -1,10 +1,11 @@
 # wt_gateway_app
 
-Aplicación **Flutter (Android)** para instaladores. Descubre por Bluetooth
-los modulos ESP32, los asigna a un vehículo y permite
-liberar el corte de combustible. El corte es autónomo en el equipo; la app autentica y solo puede deshabilitarlo.
+Aplicación **Flutter (Android)** para instaladores: se conecta por Bluetooth
+al módulo ESP32, lo asigna a un vehículo y libera el corte de combustible.
+Con firmware V3 el módulo se asigna en modo Protect (corte) o Sharing
+(corte + puertas). El corte lo aplica el equipo de forma autónoma.
 
-- **Versión:** 1.0.0 · ver [CHANGELOG.md](CHANGELOG.md)
+- **Versión:** 1.1.0 · ver [CHANGELOG.md](CHANGELOG.md)
 - **Plataforma:** Android
 - **Licencia:** [MIT](LICENSE)
 
@@ -12,8 +13,9 @@ liberar el corte de combustible. El corte es autónomo en el equipo; la app aute
 
 ## Estado del proyecto
 
-El proyecto está **funcional** con el firmware V1:
-escanear, conectar, asignar y liberar el corte funcionan sobre un equipo real.
+El proyecto está **funcional** con el firmware V1 (corte) y V3 (corte + puertas,
+`>= 3.4.0`): escanear, conectar, asignar y liberar el corte funcionan sobre un
+equipo real.
 Es un release estable y modular pensado para
 que otros la clonen y agreguen módulos.
 
@@ -23,12 +25,19 @@ que otros la clonen y agreguen módulos.
 - Chip de estado por equipo: `Sin asignar`, `Corte activo`, `Liberado`, `Estado sin leer`.
 - Conexión guiada en 3 pasos (Conectar → Autenticar → Leer estado) con reintento por etapa.
 - Autenticación reto-respuesta HMAC-SHA256.
-- Wizard de asignación en 4 pasos (identificar → confirmar → provisionar → listo).
-- Liberar corte del equipo.
+- Wizard de asignación en 4 pasos (identificar y elegir modo → confirmar → provisionar → listo).
+- Liberar corte del equipo, con la confirmación del GPS (firmware V3).
 - Desasignar equipo (renombra la placa al genérico `WT-xxxx`).
-- Log de depuración exportable.
+- Modo de la placa al asignar: `Protect` (solo corte por ignición) o `Sharing`
+  (el corte por ignición también cierra las puertas y liberarlo desde la app
+  las abre). Firmware V3.
+- Aviso de standby con botón Habilitar y aviso de corte activado (firmware V3).
+- Log de depuración exportable, con la respuesta del GPS (OK/ERROR) a cada orden.
 
-### Fuera del alcance V1.0
+Los modos y avisos solo se muestran si el firmware los anuncia en
+`<VERSION caps=...>`; con firmware V1 la app se comporta igual que en 1.0.0.
+
+### Fuera del alcance
 
 - Asignacion de Usuarios (Creacion de Cuenta o Similares).
 - Compilación y validación en iOS.
@@ -101,7 +110,7 @@ Los permisos BLE ya están declarados en
 lib/
 ├── config.dart      Constantes: master key (inyectada), UUIDs NUS, filtro BLE.
 ├── main.dart        Entrada, init de stores, MaterialApp + tema.
-├── models/          DeviceState (+ AccessoryChip), VehicleType.
+├── models/          DeviceState (+ AccessoryChip), VehicleType, BoardMode.
 ├── services/        BLE, cripto (HMAC), stores (tema/equipos), log.
 ├── theme/           Sistema de diseño: WtColors mode-aware + ThemeData.
 ├── widgets/         Componentes reutilizables (botón, nav, switch,
@@ -139,6 +148,11 @@ token      = HMAC-SHA256(device_key, nonce)[0:16]
 
 Comandos: `>STATUS`, `>CHALLENGE`, `>AUTH`, `>MAC`, `>NAME`, `>PROVISION`,
 `>DISABLECUT`, `>UNPROVISION`, `>VERSION`.
+
+Firmware V3 (car sharing) agrega, entre otros: `>SET_MODE protect|sharing`,
+`>ENABLE 1|0`, `<RELEASE` (resultado de la liberación) y `<LOCK` (corte
+aplicado). `<STATUS` suma `mode=` y `en=`. La app usa solo esos; el resto del
+protocolo está en `docs/PROTOCOLO.md` del firmware V3.
 
 ---
 

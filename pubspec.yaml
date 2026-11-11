@@ -1,7 +1,7 @@
 name: wt_gateway_app
 description: App BLE para asignación y corte de accesorios. Firmware V1 (corte autónomo por ignición/geocerca).
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.6.0 <4.0.0'

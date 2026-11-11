@@ -1,5 +1,6 @@
 // Detalle del equipo conectado.
-// Muestra estado, permite liberar corte (con confirmación) y gestionar el equipo.
+// Muestra estado y modo de la placa, permite liberar corte (con confirmación;
+// en sharing también abre las puertas) y gestionar el equipo.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -34,6 +35,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   String? _lastShownError;
+  int _lockSeqShown = 0;
 
   void _onStateChange() {
     final s = widget.ble.state;
@@ -49,6 +51,21 @@ class _DeviceScreenState extends State<DeviceScreen> {
       showWtToast(context, 'Error del equipo: ${s.lastError}', error: true);
     }
     if (s.lastError == null) _lastShownError = null;
+    // Activación del corte informada por la placa (<LOCK, fw >= 3.4.5): solo
+    // llega si la app está conectada cuando se cumple el retardo tras apagar.
+    final lock = widget.ble.lastLock;
+    if (widget.ble.lockSeq != _lockSeqShown && lock != null && mounted) {
+      _lockSeqShown = widget.ble.lockSeq;
+      final ok = lock.contains('gps=ok');
+      showWtToast(
+          context,
+          ok
+              ? (lock.contains('door=closed')
+                  ? 'Corte activado · puertas cerradas'
+                  : 'Corte activado')
+              : 'El GPS no confirmó la activación del corte',
+          error: !ok);
+    }
     if (mounted) setState(() {});
   }
 
@@ -70,18 +87,51 @@ class _DeviceScreenState extends State<DeviceScreen> {
       context,
       icon: Icons.lock_open,
       title: 'Liberar corte',
-      message: 'El vehículo $_title quedará operativo. '
+      message: 'El vehículo $_title quedará operativo'
+          '${widget.ble.state.isSharing ? ' y se abrirán las puertas' : ''}. '
           'Confirma que deseas liberar el corte.',
       confirmLabel: 'Liberar',
       accent: kGreen,
     );
     if (ok) {
       final success = await widget.ble.disableCut();
-      if (mounted && !success) {
-        showWtToast(context, 'No se pudo confirmar la liberación',
+      if (!mounted) return;
+      final rel = widget.ble.lastRelease;
+      if (success) {
+        if (rel != null) {
+          showWtToast(context,
+              rel.contains('door=open') ? 'Corte liberado · puertas abiertas' : 'Corte liberado');
+        }
+      } else {
+        showWtToast(
+            context,
+            rel == null
+                ? 'No se pudo confirmar la liberación'
+                : rel.contains('gps=error')
+                    ? 'El GPS rechazó la liberación (ver log)'
+                    : 'El GPS no confirmó la liberación',
             error: true);
       }
     }
+  }
+
+  bool _busy = false;
+
+  /// Texto legible de los códigos <ERR del firmware.
+  String _errText(String code) => switch (code) {
+        'device_disabled' => 'Equipo en standby',
+        'timeout' => 'El equipo no respondió',
+        'busy' => 'Hay otra orden en curso',
+        _ => code,
+      };
+
+  /// Ejecuta una orden a la placa mostrando el resultado en un toast.
+  Future<void> _run(Future<String?> Function() op, String okMsg) async {
+    setState(() => _busy = true);
+    final err = await op();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    showWtToast(context, err == null ? okMsg : _errText(err), error: err != null);
   }
 
   Future<void> _confirmReboot() async {
@@ -249,6 +299,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
               s.ignOn == null
                   ? '—'
                   : (s.ignOn! ? 'Encendida' : 'Apagada')),
+          if (s.mode != null) ...[
+            const SizedBox(height: 12),
+            _panelRow('Modo', s.modeLabel),
+          ],
           if (s.connected && widget.ble.authed) ...[
             const SizedBox(height: 14),
             _liveTag(),
@@ -340,6 +394,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     final canRelease = s.connected &&
         widget.ble.authed &&
         s.relay == RelayState.cutActive;
+    final canAct = s.connected && widget.ble.authed && !_busy;
 
     return Scaffold(
       body: SafeArea(
@@ -351,6 +406,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 child: Column(
                   children: [
                     _statusPanel(s),
+                    // Placa en standby: no corta ni acciona puertas.
+                    if (s.connected && widget.ble.authed && s.enabled == false)
+                      _standbyBanner(s, canAct),
                     // Aviso contextual
                     if (s.cutDisabled == true)
                       _infoBanner(
@@ -392,7 +450,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ],
         ),
       ),
-      // Botón fijo: solo "Liberar corte"
+      // Botón fijo: liberar corte (en sharing también abre las puertas).
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
@@ -406,6 +464,44 @@ class _DeviceScreenState extends State<DeviceScreen> {
       ),
     );
   }
+
+  /// Aviso de standby (`en=0`): la placa no aplica el corte ni acciona puertas
+  /// hasta habilitarla (>ENABLE 1, fw >= 3.4.6).
+  Widget _standbyBanner(DeviceState s, bool canAct) => Container(
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: wt.orangeSoft,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.power_settings_new, color: kOrange, size: 19),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                      'Equipo en standby: no aplica el corte ni acciona puertas.',
+                      style: TextStyle(fontSize: 12.5, color: wt.ink2)),
+                ),
+              ],
+            ),
+            if (s.supportsEnable) ...[
+              const SizedBox(height: 10),
+              WtButton(
+                label: 'Habilitar',
+                icon: Icons.power_settings_new,
+                onTap: canAct
+                    ? () => _run(() => widget.ble.setEnabled(true), 'Equipo habilitado')
+                    : null,
+              ),
+            ],
+          ],
+        ),
+      );
 
   Widget _infoBanner(String text) => Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),

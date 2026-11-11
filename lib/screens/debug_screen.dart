@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../services/debug_log.dart';
+import '../services/theme_store.dart';
 import '../theme/wt_theme.dart';
 import '../widgets/wt_dialog.dart';
 import '../widgets/wt_toast.dart';
@@ -61,15 +62,8 @@ class _DebugScreenState extends State<DebugScreen> {
     if (ok) DebugLog.instance.clear();
   }
 
-  Color _lineColor(String line) {
-    if (line.contains('ERROR') || line.contains('FAIL')) {
-      return Colors.red[300]!;
-    }
-    if (line.contains('AUDIT')) return Colors.amber[300]!;
-    if (line.contains('→')) return Colors.blue[300]!;
-    if (line.contains('←')) return Colors.green[300]!;
-    return Colors.grey[400]!;
-  }
+  /// Color por tipo de línea, legible en claro y oscuro.
+  Color _lineColor(String line) => logLineColor(line);
 
   @override
   Widget build(BuildContext context) {
@@ -116,9 +110,9 @@ class _DebugScreenState extends State<DebugScreen> {
           ),
           Expanded(
             child: lines.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text('Sin registros todavía',
-                        style: TextStyle(color: Colors.grey)))
+                        style: TextStyle(color: wt.gray)))
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 4),
@@ -143,4 +137,19 @@ class _DebugScreenState extends State<DebugScreen> {
       ),
     );
   }
+}
+
+/// Paleta del log: tonos 300 sobre fondo oscuro,
+/// tonos 800 sobre fondo claro para mantener contraste.
+Color logLineColor(String line) {
+  final dark = ThemeStore.isDark;
+  if (line.contains('GPSACK ERROR') || line.contains('ERROR') || line.contains('FAIL') || line.contains('<ERR')) {
+    return dark ? Colors.red[300]! : Colors.red[800]!;
+  }
+  if (line.contains('GPSACK OK')) return dark ? Colors.teal[200]! : Colors.teal[800]!;
+  if (line.contains('AUDIT')) return dark ? Colors.amber[300]! : Colors.orange[900]!;
+  if (line.contains('TXGPS')) return dark ? Colors.purple[200]! : Colors.purple[700]!;
+  if (line.contains('→')) return dark ? Colors.blue[300]! : Colors.blue[800]!;
+  if (line.contains('←')) return dark ? Colors.green[300]! : Colors.green[800]!;
+  return dark ? Colors.grey[400]! : Colors.grey[800]!;
 }
