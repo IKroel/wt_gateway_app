@@ -308,6 +308,10 @@ class BleService extends ChangeNotifier {
 
   /// Provisiona el equipo. Retorna resultado tipado al recibir <PROVISION_OK o error/timeout.
   Future<ProvisionResult> provision(String newName) async {
+    if (!MasterKeyStore.isConfigured) {
+      return const ProvisionResult(
+          ok: false, error: 'App compilada sin master key (WT_MASTER_SECRET)');
+    }
     _provisionCompleter = Completer<ProvisionResult>();
     await sendCommand('>MAC');
     await Future.delayed(const Duration(milliseconds: 300));

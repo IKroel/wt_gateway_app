@@ -1,8 +1,9 @@
 // Constantes globales: master key, UUIDs NUS y filtro BLE.
 //
-// Master key de pruebas: única y compartida por todos los equipos de prueba.
-const String kMasterSecret =
-    'cfc03b94812eee0b3d3b385b1378bb034c8303cdc94975ce34958056d0a5f76c';
+// Master key: no se versiona. Se inyecta al compilar con
+//   --dart-define-from-file=<archivo.json>   ({"WT_MASTER_SECRET": "<64 hex>"})
+// Sin ella la app no puede autenticar ni asignar equipos.
+const String kMasterSecret = String.fromEnvironment('WT_MASTER_SECRET');
 
 // BLE — Nordic UART Service
 const String kNusSvcUuid = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E';

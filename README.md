@@ -46,7 +46,15 @@ que otros la clonen y agreguen módulos.
 Dependencias clave: `flutter_blue_plus`, `crypto`, `convert`,
 `permission_handler`, `shared_preferences`, `path_provider`, `share_plus`.
 
-La master key de pruebas ya viene definida en `lib/config.dart`.
+La master key **no está en el repositorio**. Pídela al responsable del proyecto
+y guárdala fuera del repo en un JSON:
+
+```json
+{"WT_MASTER_SECRET": "<64 caracteres hex>"}
+```
+
+Se pasa al compilar con `--dart-define-from-file=<ruta al JSON>` (ver abajo).
+Sin ella la app abre, pero no puede autenticar ni asignar equipos.
 
 ---
 
@@ -56,7 +64,7 @@ La master key de pruebas ya viene definida en `lib/config.dart`.
 git clone https://github.com/IKroel/wt_gateway_app.git
 cd wt_gateway_app
 flutter pub get
-flutter run
+flutter run --dart-define-from-file=<ruta>/wt_master_key.json
 ```
 
 Si al clonar faltan las carpetas de plataforma (`android/`, `ios/`), genéralas
@@ -65,13 +73,13 @@ sin tocar `lib/` y vuelve a correr:
 ```bash
 flutter create .
 flutter pub get
-flutter run
+flutter run --dart-define-from-file=<ruta>/wt_master_key.json
 ```
 
 Compilar el APK de release:
 
 ```bash
-flutter build apk --release
+flutter build apk --release --dart-define-from-file=<ruta>/wt_master_key.json
 ```
 
 Verificar código:
@@ -91,7 +99,7 @@ Los permisos BLE ya están declarados en
 
 ```
 lib/
-├── config.dart      Constantes: master key, UUIDs NUS, filtro BLE.
+├── config.dart      Constantes: master key (inyectada), UUIDs NUS, filtro BLE.
 ├── main.dart        Entrada, init de stores, MaterialApp + tema.
 ├── models/          DeviceState (+ AccessoryChip), VehicleType.
 ├── services/        BLE, cripto (HMAC), stores (tema/equipos), log.

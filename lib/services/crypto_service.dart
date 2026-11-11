@@ -11,6 +11,9 @@ import 'master_key_store.dart';
 class CryptoService {
   /// Deriva device_key a partir del master y la MAC BLE ("AA:BB:CC:DD:EE:FF").
   static Uint8List deriveDeviceKey(String macStr) {
+    if (!MasterKeyStore.isConfigured) {
+      throw StateError('master key no configurada (compilar con WT_MASTER_SECRET)');
+    }
     final master = Uint8List.fromList(hex.decode(MasterKeyStore.effective));
     final macBytes = Uint8List.fromList(
       macStr.toUpperCase().split(':').map((s) => int.parse(s, radix: 16)).toList(),

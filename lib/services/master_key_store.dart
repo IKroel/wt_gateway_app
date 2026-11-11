@@ -18,6 +18,9 @@ class MasterKeyStore {
 
   static bool get isOverridden => _override != null;
 
+  /// false si la app se compiló sin WT_MASTER_SECRET y no hay override.
+  static bool get isConfigured => effective.isNotEmpty;
+
   static bool isValid(String key) =>
       RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(key.trim());
 

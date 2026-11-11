@@ -34,6 +34,7 @@ android/app/profile/
 android/app/release/
 android/local.properties
 key.properties
+wt_master_key.json
 **/*.keystore
 **/*.jks
 

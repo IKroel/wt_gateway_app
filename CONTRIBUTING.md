@@ -7,7 +7,8 @@ y **extender** la app con nuevos módulos a partir de una base local.
 
 - Flutter `>=3.6.0`. Corre `flutter doctor` y resuelve lo que marque.
 - `flutter pub get`.
-- Corre la app con `flutter run` (la master key de pruebas ya viene en `lib/config.dart`).
+- Corre la app con `flutter run --dart-define-from-file=<ruta>/wt_master_key.json`
+  (la master key no se versiona; ver README).
 
 ## Estilo y calidad
 
